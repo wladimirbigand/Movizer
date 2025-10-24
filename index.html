@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="violet">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Movizer — TMDB Powered</title>
+  <meta name="description" content="Catalogue de films en direct depuis TMDB : recherche, genres, favoris, trailers.">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+  <style>
+    :root{
+      --violet-2:#4b0082; --violet-3:#6a0dad; --violet-4:#8a4fff;
+      --bg:#0b0b12; --bg-soft:#12121d; --text:#e9e9f1; --muted:#bfb7b7;
+      --card:#161625; --glow: 0 0 24px rgba(138,79,255,.55);
+      --shadow: 0 10px 30px rgba(0,0,0,.35); --radius:18px;
+    }
+    body{margin:0;color:var(--text);background:radial-gradient(1200px 800px at 70% -10%,rgba(138,79,255,.25),transparent),var(--bg);font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Arial}
+    .navbar{position:sticky;top:0;z-index:50;backdrop-filter:saturate(1.4) blur(10px);background:linear-gradient(90deg, rgba(75,0,130,.85), rgba(106,13,173,.85))!important;border-bottom:1px solid rgba(255,255,255,.08);box-shadow:var(--shadow)}
+    .navbar-brand{font-weight:900;text-shadow:var(--glow)}
+    .search-wrap{background:var(--bg-soft);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius);box-shadow:var(--shadow);padding:10px}
+    .chip{border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);border-radius:999px;padding:8px 14px;cursor:pointer}
+    .chip.active,.chip:hover{background:rgba(138,79,255,.18);border-color:rgba(138,79,255,.45)}
+    .hero{padding:100px 0 70px;background:linear-gradient(180deg, rgba(75,0,130,.55), rgba(106,13,173,.55)), url('https://images.unsplash.com/photo-1497015289639-54688650d173?q=80&w=1600&auto=format&fit=crop') center/cover;border-bottom-left-radius:40px;border-bottom-right-radius:40px;box-shadow:var(--shadow)}
+    .grid{display:grid;gap:24px}
+    @media(min-width:576px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(min-width:992px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+    .text-muted {
+  color: var(--muted) !important;
+  opacity: 0.85;
+}
+
+    .movie-card{position:relative;border-radius:var(--radius);overflow:hidden;background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.12);box-shadow:var(--shadow);transition:transform .2s, box-shadow .2s}
+    .movie-card:hover{transform:translateY(-4px);box-shadow:0 18px 48px rgba(106,13,173,.35)}
+    .movie-thumb{height:320px;width:100%;object-fit:cover;background:#222}
+    .movie-body{padding:12px 14px 16px}
+    .genre-badge{background:rgba(138,79,255,.18);color:#fff;border:1px solid rgba(138,79,255,.4);padding:4px 10px;border-radius:999px;font-size:.8rem;margin-right:6px}
+    .btn-ghost{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:var(--text);border-radius:12px;padding:8px 12px}
+    .fav-toggle{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:999px;padding:8px 10px}
+    .fav-toggle.active{background:linear-gradient(135deg,#ff357a,#ffb178)}
+    .modal-content{background:var(--bg-soft);color:var(--text);border:1px solid rgba(255,255,255,.12);border-radius:18px}
+    .offcanvas{background:var(--bg-soft);color:var(--text)}
+    .stars i{font-size:1.1rem;cursor:pointer}
+    .stars i.active{color:#ffd54a;text-shadow:0 0 18px rgba(255,213,74,.6)}
+    footer{margin-top:56px;padding:36px 0;background:linear-gradient(90deg, rgba(106,13,173,.35), rgba(75,0,130,.35));border-top-left-radius:28px;border-top-right-radius:28px;border-top:1px solid rgba(255,255,255,.12)}
+  </style>
+</head>
+<body>
+  <!-- NAVBAR -->
+  <nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="#"><i class="bi bi-film fs-3"></i> Movizer</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav"><span class="navbar-toggler-icon"></span></button>
+      <div class="collapse navbar-collapse" id="nav">
+        <ul class="navbar-nav me-auto ms-lg-3">
+          <li class="nav-item"><a class="nav-link active" href="#"><i class="bi bi-house-door"></i> Accueil</a></li>
+          <li class="nav-item"><a class="nav-link" href="#catalogue"><i class="bi bi-collection-play"></i> Catalogue</a></li>
+          <li class="nav-item"><a class="nav-link" href="#" data-bs-toggle="offcanvas" data-bs-target="#favCanvas"><i class="bi bi-heart"></i> Mes favoris</a></li>
+        </ul>
+        <form id="searchForm" class="d-flex search-wrap ms-auto" role="search">
+          <input id="searchInput" class="form-control me-2" type="search" placeholder="Rechercher un film, un genre…" aria-label="Rechercher"/>
+          <button class="btn btn-ghost" type="submit"><i class="bi bi-search"></i></button>
+        </form>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="container">
+      <div class="row align-items-center">
+        <div class="col-lg-8">
+          <span class="badge text-bg-light">Propulsé par TMDB</span>
+          <h1 class="display-4 fw-bold mt-3 mb-2" style="text-shadow: var(--glow)">Découvrez le Cinéma Autrement</h1>
+          <p class="lead mb-4">Tendances, recherche instantanée, fiches détaillées et bandes-annonces.</p>
+          <div class="d-flex gap-2">
+            <a href="#catalogue" class="btn btn-light btn-lg"><i class="bi bi-stars"></i> Explorer</a>
+            <button id="randomBtn" class="btn btn-outline-light btn-lg"><i class="bi bi-shuffle"></i> Me surprendre</button>
+          </div>
+        </div>
+        <div class="col-lg-4 mt-4 mt-lg-0">
+          <div class="p-3 border rounded-4" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15)">
+            <h5 class="mb-3"><i class="bi bi-fire"></i> Tendances du jour</h5>
+            <div id="trendPeek" class="vstack gap-2 small"></div>
+            <small class="text-muted d-block mt-2">Source : TMDB</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- FILTERS -->
+  <section class="container mt-4">
+    <div id="chips" class="d-flex flex-wrap gap-2 justify-content-center">
+      <span class="chip active" data-genre="all"><i class="bi bi-stars"></i> Tous</span>
+    </div>
+  </section>
+
+  <!-- CATALOGUE -->
+  <main class="container mt-3" id="catalogue">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <h2 class="mb-0"><i class="bi bi-star-fill text-warning"></i> Films</h2>
+      <div class="d-flex align-items-center gap-2">
+        <button id="btnPopular" class="btn btn-ghost btn-sm">Populaires</button>
+        <button id="btnTopRated" class="btn btn-ghost btn-sm">Top</button>
+        <button id="btnNow" class="btn btn-ghost btn-sm">En salle</button>
+      </div>
+    </div>
+    <div id="grid" class="grid"></div>
+    <div class="d-flex justify-content-center my-4 gap-2">
+      <button id="prevPage" class="btn btn-ghost btn-sm" disabled><i class="bi bi-arrow-left"></i> Précédent</button>
+      <span id="pageInfo" class="align-self-center small text-muted"></span>
+      <button id="nextPage" class="btn btn-ghost btn-sm" disabled>Suivant <i class="bi bi-arrow-right"></i></button>
+    </div>
+  </main>
+
+  <!-- MODAL DETAILS -->
+  <div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 id="modalTitle" class="modal-title"></h5>
+          <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-5">
+              <img id="modalImg" class="w-100 rounded-3" alt="">
+              <div class="mt-2 d-flex gap-2 flex-wrap" id="modalGenres"></div>
+            </div>
+            <div class="col-md-7">
+              <p id="modalDesc" class="mb-2"></p>
+              <div id="modalMeta" class="small text-muted mb-2"></div>
+              <div class="ratio ratio-16x9 rounded-3 border" id="trailerWrap" style="display:none">
+                <iframe id="trailer" src="" title="Bande-annonce YouTube" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+              </div>
+              <div class="d-flex gap-2 mt-3">
+                <div class="stars" id="modalStars" aria-label="Votre note"></div>
+                <button id="modalFav" class="btn btn-ghost ms-auto"><i class="bi bi-heart"></i> Favori</button>
+              </div>
+              <small class="text-muted d-block mt-2">Données © TMDB — affiches via CDN.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OFFCANVAS FAVORIS -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="favCanvas">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title"><i class="bi bi-heart-fill text-danger"></i> Mes favoris</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+      <div id="favList" class="vstack gap-3"></div>
+      <button id="clearFavs" class="btn btn-ghost mt-3"><i class="bi bi-trash3"></i> Vider</button>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="text-center">
+    <div class="container">
+      <p class="mb-1">&copy; 2025 Movizer — Source TMDB. Réalisé par <strong>Wladimir</strong>.</p>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+  // ========= CONFIG TMDB =========
+  const API_KEY = "405cdeee132342f61bd9c1be6db4a718"; // <-- REMPLACE PAR TA CLÉ
+  const API_BASE = "https://api.themoviedb.org/3";
+  const LANG = "fr-FR";
+  const IMG_ORIG = "https://image.tmdb.org/t/p/original";
+  const IMG_500  = "https://image.tmdb.org/t/p/w500";
+  const PLACEHOLDER = "https://placehold.co/600x900/222/EEE?text=No+Poster";
+
+  // ========= STATE =========
+  let currentPage = 1, totalPages = 1, currentFeed = "popular", currentQuery = "", activeGenre = "all";
+  let GENRES = []; // {id, name}
+  const favKey='movizer_favs', rateKey='movizer_ratings';
+  const readJSON=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
+  const writeJSON=(k,v)=>localStorage.setItem(k, JSON.stringify(v));
+  let FAVS = readJSON(favKey,[]), RATINGS=readJSON(rateKey,{});
+
+  const $ = s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+  const grid = $('#grid'), pageInfo=$('#pageInfo'), prevBtn=$('#prevPage'), nextBtn=$('#nextPage');
+
+  // ========= FETCH HELPERS =========
+  const headers = {accept:"application/json"};
+  const qs = p => new URLSearchParams(p).toString();
+  async function api(path, params={}){
+    const url = `${API_BASE}${path}?${qs({...params, api_key:API_KEY, language:LANG})}`;
+    const res = await fetch(url, {headers}); if(!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
+
+  // ========= INIT =========
+  (async function init(){
+    await loadGenres();
+    buildGenreChips();
+    loadTrendsPeek();
+    loadFeed('popular');
+  })().catch(console.error);
+
+  // ========= GENRES =========
+  async function loadGenres(){
+    const {genres} = await api('/genre/movie/list');
+    GENRES = genres;
+  }
+  function buildGenreChips(){
+    const wrap = $('#chips');
+    GENRES.forEach(g=>{
+      const el = document.createElement('span');
+      el.className = 'chip'; el.dataset.genre = g.id; el.textContent = g.name;
+      wrap.appendChild(el);
+    });
+    wrap.addEventListener('click', e=>{
+      const chip = e.target.closest('.chip'); if(!chip) return;
+      $$('#chips .chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+      activeGenre = chip.dataset.genre;
+      refresh();
+    });
+  }
+
+  // ========= LISTS (popular/top/now/search) =========
+  async function loadFeed(feed, page=1){
+    currentFeed = feed; currentPage=page; currentQuery=""; // reset search
+    let data;
+    if(feed==='popular') data = await api('/movie/popular', {page});
+    else if(feed==='top') data = await api('/movie/top_rated', {page});
+    else if(feed==='now') data = await api('/movie/now_playing', {page, region:'FR'});
+    renderList(data);
+  }
+  async function searchMovies(query, page=1){
+    currentFeed='search'; currentPage=page; currentQuery=query;
+    const data = await api('/search/movie', {query, include_adult:false, page});
+    renderList(data);
+  }
+  function renderList({results=[], page=1, total_pages=1}){
+    totalPages = total_pages; currentPage = page;
+    const filtered = results.filter(m=>{
+      if(activeGenre==='all') return true;
+      return (m.genre_ids||[]).includes(Number(activeGenre));
+    });
+    grid.innerHTML = filtered.map(cardTemplate).join('') || `<div class="text-center text-muted py-5">Aucun résultat.</div>`;
+    pageInfo.textContent = `Page ${currentPage} / ${totalPages}`;
+    prevBtn.disabled = currentPage<=1; nextBtn.disabled = currentPage>=totalPages;
+  }
+  function cardTemplate(m){
+    const title = m.title || m.name || 'Sans titre';
+    const poster = m.poster_path ? `${IMG_500}${m.poster_path}` : PLACEHOLDER;
+    const overview = m.overview || 'Aucun synopsis disponible en français.';
+    const fav = FAVS.includes(m.id) ? 'active' : '';
+    const rate = RATINGS[m.id]||0;
+    const genres = (m.genre_ids||[]).map(id=>GENRES.find(g=>g.id===id)?.name).filter(Boolean);
+    return `
+      <article class="movie-card" data-id="${m.id}">
+        <button class="fav-toggle ${fav}" data-fav="${m.id}" title="Favori"><i class="bi bi-heart${fav?' -fill':''}"></i></button>
+        <img class="movie-thumb" src="${poster}" alt="Affiche ${title}" loading="lazy" onerror="this.src='${PLACEHOLDER}'">
+        <div class="movie-body">
+          <h3 class="h6 mb-1 fw-bold">${title}</h3>
+          <p class="text-muted small mb-2">${escapeHTML(overview).slice(0,120)}${overview.length>120?'…':''}</p>
+          <div class="mb-2">${genres.map(g=>`<span class="genre-badge">${g}</span>`).join('')}</div>
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="stars small" data-stars="${m.id}">
+              ${[1,2,3,4,5].map(i=>`<i class="bi ${rate>=i?'bi-star-fill active':'bi-star'}" data-rate="${i}" title="${i}/5"></i>`).join('')}
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn-ghost btn-sm" data-detail="${m.id}"><i class="bi bi-info-circle"></i> Détails</button>
+            </div>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  // ========= DETAIL MODAL + TRAILER =========
+  const modal = new bootstrap.Modal('#detailModal');
+  async function openDetail(id){
+    const [movie, vids] = await Promise.all([
+      api(`/movie/${id}`, {append_to_response:'credits', include_image_language:'fr,null'}),
+      api(`/movie/${id}/videos`)
+    ]);
+    $('#modalTitle').textContent = movie.title;
+    $('#modalImg').src = movie.poster_path ? `${IMG_500}${movie.poster_path}` : PLACEHOLDER;
+    $('#modalImg').alt = 'Affiche ' + movie.title;
+    $('#modalDesc').textContent = movie.overview || 'Aucun synopsis disponible.';
+    $('#modalGenres').innerHTML = (movie.genres||[]).map(g=>`<span class="genre-badge">${g.name}</span>`).join('');
+    const meta = [];
+    if(movie.release_date) meta.push(`Sortie : ${formatDateFR(movie.release_date)}`);
+    if(movie.runtime) meta.push(`${movie.runtime} min`);
+    if(movie.vote_average) meta.push(`Note TMDB : ${movie.vote_average.toFixed(1)}/10 (${movie.vote_count} votes)`);
+    $('#modalMeta').innerHTML = meta.join(' • ') || '';
+    // Stars
+    const wrap = $('#modalStars'); const rate = RATINGS[id]||0;
+    wrap.innerHTML = [1,2,3,4,5].map(i=>`<i class="bi ${rate>=i?'bi-star-fill active':'bi-star'}" data-rate="${i}"></i>`).join('');
+    wrap.querySelectorAll('i').forEach(i=>i.addEventListener('click', ()=>{
+      RATINGS[id]=Number(i.dataset.rate); writeJSON(rateKey,RATINGS); openDetail(id); // refresh
+    }));
+    // Fav button
+    const favBtn = $('#modalFav');
+    favBtn.innerHTML = FAVS.includes(id) ? '<i class="bi bi-heart-fill"></i> Retirer' : '<i class="bi bi-heart"></i> Favori';
+    favBtn.onclick = ()=>{ toggleFav(id); openDetail(id); };
+    // Trailer (YouTube)
+    const y = (vids.results||[]).find(v=>v.site==='YouTube' && (v.type==='Trailer' || v.type==='Teaser'));
+    if(y){ $('#trailerWrap').style.display='block'; $('#trailer').src = `https://www.youtube.com/embed/${y.key}`; }
+    else { $('#trailerWrap').style.display='none'; $('#trailer').src=''; }
+    modal.show();
+  }
+
+  // ========= FAVORIS / NOTES =========
+  function toggleFav(id){
+    const i = FAVS.indexOf(id);
+    if(i>-1) FAVS.splice(i,1); else FAVS.push(id);
+    writeJSON(favKey, FAVS); refresh(); renderFavs();
+  }
+  function renderFavs(){
+    const box = $('#favList');
+    if(!FAVS.length){ box.innerHTML = '<p class="text-muted">Aucun favori.</p>'; return; }
+    // Fetch minimal details for each favorite (batch with Promise.all)
+    Promise.all(FAVS.map(fid=>api(`/movie/${fid}`))).then(items=>{
+      box.innerHTML = items.map(m=>`
+        <div class="d-flex gap-3 align-items-center">
+          <img src="${m.poster_path?IMG_500+m.poster_path:PLACEHOLDER}" width="54" height="80" class="rounded-2" alt="">
+          <div class="flex-grow-1">
+            <div class="fw-bold">${m.title}</div>
+            <small class="text-muted">${(m.genres||[]).slice(0,2).map(g=>g.name).join(' • ')}</small>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="openDetail(${m.id})"><i class="bi bi-info-circle"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="(function(){toggleFav(${m.id});})();"><i class="bi bi-trash3"></i></button>
+        </div>`).join('');
+    }).catch(()=>{ box.innerHTML='<p class="text-muted">Erreur de chargement.</p>'; });
+  }
+  renderFavs();
+  $('#clearFavs').addEventListener('click', ()=>{FAVS=[]; writeJSON(favKey,FAVS); renderFavs(); refresh();});
+
+  // ========= EVENTS =========
+  // Grid delegation
+  grid.addEventListener('click', e=>{
+    const favBtn = e.target.closest('[data-fav]'); if(favBtn){ toggleFav(Number(favBtn.dataset.fav)); return; }
+    const detailBtn = e.target.closest('[data-detail]'); if(detailBtn){ openDetail(Number(detailBtn.dataset.detail)); return; }
+    const star = e.target.closest('[data-rate]'); if(star){
+      const id = Number(star.closest('.stars').dataset.stars);
+      RATINGS[id] = Number(star.dataset.rate); writeJSON(rateKey,RATINGS); refresh(); return;
+    }
+  });
+
+  // Pagination
+  prevBtn.addEventListener('click', ()=> goPage(currentPage-1));
+  nextBtn.addEventListener('click', ()=> goPage(currentPage+1));
+  function goPage(p){ if(p<1||p>totalPages) return;
+    if(currentFeed==='search') searchMovies(currentQuery, p); else {
+      const map = {popular:'popular', top:'top', now:'now'};
+      loadFeed(map[currentFeed]||'popular', p);
+    }
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  // Top strip buttons
+  $('#btnPopular').addEventListener('click', ()=> loadFeed('popular'));
+  $('#btnTopRated').addEventListener('click', ()=> loadFeed('top'));
+  $('#btnNow').addEventListener('click', ()=> loadFeed('now'));
+
+  // Search (debounce)
+  $('#searchForm').addEventListener('submit', e=>{e.preventDefault(); doSearch();});
+  let t; $('#searchInput').addEventListener('input', ()=>{
+    clearTimeout(t); t = setTimeout(doSearch, 300);
+  });
+  function doSearch(){
+    const q = $('#searchInput').value.trim();
+    if(q.length===0){ loadFeed('popular'); return; }
+    searchMovies(q);
+  }
+
+  // Random
+  $('#randomBtn').addEventListener('click', async ()=>{
+    const data = await api('/trending/movie/day', {page:1});
+    const list = data.results || []; if(!list.length) return;
+    const id = list[Math.floor(Math.random()*list.length)].id;
+    openDetail(id);
+  });
+
+  // Trend peek (small)
+  async function loadTrendsPeek(){
+    try{
+      const data = await api('/trending/movie/day',{page:1});
+      const wrap = $('#trendPeek');
+      wrap.innerHTML = (data.results||[]).slice(0,4).map(m=>`
+        <div class="d-flex align-items-center gap-2">
+          <img src="${m.poster_path?IMG_500+m.poster_path:PLACEHOLDER}" width="34" height="50" class="rounded-2" alt="">
+          <div class="text-truncate" title="${m.title}">${m.title}</div>
+          <button class="btn btn-ghost btn-sm ms-auto" onclick="openDetail(${m.id})"><i class="bi bi-info-circle"></i></button>
+        </div>`).join('');
+    }catch(e){ $('#trendPeek').innerHTML='<span class="text-muted">Indisponible.</span>';}
+  }
+
+  // Refresh current view
+  function refresh(){
+    if(currentFeed==='search') searchMovies(currentQuery, currentPage);
+    else {
+      const map = {popular:'popular', top:'top', now:'now'};
+      loadFeed(map[currentFeed]||'popular', currentPage);
+    }
+  }
+
+  // Utils
+  function escapeHTML(s){return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function formatDateFR(iso){ try{ const d = new Date(iso); return d.toLocaleDateString('fr-FR', {year:'numeric', month:'long', day:'numeric'});}catch{return iso;} }
+  </script>
+</body>
+</html>
